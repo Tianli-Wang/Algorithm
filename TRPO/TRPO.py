@@ -30,6 +30,7 @@ class ValueNet(torch.nn.Module):
 
 class TRPO:
     def __init__(self, state_dim, hidden_dim, action_dim, lmbda, kl_constraint, alpha, critic_lr, gamma, device):
+
         self.actor_net = PolicyNet(state_dim, hidden_dim, action_dim).to(device)
         self.critic_net = ValueNet(state_dim, hidden_dim).to(device)
         self.critic_optimizer = torch.optim.Adam(self.critic_net.parameters(), lr=critic_lr)
@@ -116,6 +117,16 @@ class TRPO:
         new_para = self.line_search(states, actions, advantege, old_log_probs, old_action_dists, max_coef * descent_direction)
 
         torch.nn.utils.convert_parameters.vector_to_parameters(new_para, self.actor_net.parameters())
+
+    # def compute_advantage(gamma, lmbda, td_delta):
+    #     td_delta = td_delta.detach().numpy()
+    #     advantage_list = []
+    #     advantage = 0.0
+    #     for delta in td_delta[::-1]:
+    #         advantage = gamma * lmbda * advantage + delta
+    #         advantage_list.append(advantage)
+    #     advantage_list.reverse()
+    #     return torch.tensor(advantage_list, dtype=torch.float)
 
     def update(self, transition_dict):
         states = torch.tensor(transition_dict['states'], dtype=torch.float).to(self.device)
