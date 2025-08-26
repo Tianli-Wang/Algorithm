@@ -3,6 +3,7 @@ import numpy as np
 import gym
 import matplotlib.pyplot as plt
 import torch.nn.functional as F
+from rl_utils import compute_advantage
 import rl_utils
 import copy
 
@@ -50,8 +51,8 @@ class TRPO:
         return action.item()
     
     def Hessian_matrix_vector_product(self, states, old_action_dists, vector):
-        new_action_probs = self.actor_net(states)
-        kl =torch.mean(torch.distributions.kl.kl_divergence(old_action_dists, new_action_probs))
+        new_action_dists = torch.distributions.Categorical(self.actor_net(states))
+        kl =torch.mean(torch.distributions.kl.kl_divergence(old_action_dists, new_action_dists))
         kl_grad = torch.autograd.grad(kl, self.actor_net.parameters(), create_graph=True)
         kl_grad_vector = torch.cat([grad.view(-1) for grad in kl_grad])
 
@@ -118,16 +119,6 @@ class TRPO:
 
         torch.nn.utils.convert_parameters.vector_to_parameters(new_para, self.actor_net.parameters())
 
-    # def compute_advantage(gamma, lmbda, td_delta):
-    #     td_delta = td_delta.detach().numpy()
-    #     advantage_list = []
-    #     advantage = 0.0
-    #     for delta in td_delta[::-1]:
-    #         advantage = gamma * lmbda * advantage + delta
-    #         advantage_list.append(advantage)
-    #     advantage_list.reverse()
-    #     return torch.tensor(advantage_list, dtype=torch.float)
-
     def update(self, transition_dict):
         states = torch.tensor(transition_dict['states'], dtype=torch.float).to(self.device)
         actions = torch.tensor(transition_dict['actions']).view(-1, 1).to(self.device)
@@ -138,9 +129,9 @@ class TRPO:
 
         td_delta = td_target - self.critic_net(states)
         advantage = compute_advantage(self.gamma, self.lmbda, td_delta).to(self.device)
-        old_log_probs = torch.log(self.actor(states).gather(1, actions)).detach()
-        old_action_dists = torch.distributions.Categorical(self.actor(states).detach())
-        critic_loss = torch.mean(F.mse_loss(self.critic(states), td_target.detach()))
+        old_log_probs = torch.log(self.actor_net(states).gather(1, actions)).detach()
+        old_action_dists = torch.distributions.Categorical(self.actor_net(states).detach())
+        critic_loss = torch.mean(F.mse_loss(self.critic_net(states), td_target.detach()))
         self.critic_optimizer.zero_grad()
         critic_loss.backward()
         self.critic_optimizer.step()  # 更新价值函数
@@ -159,10 +150,11 @@ device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cp
 
 env_name = 'CartPole-v1'
 env = gym.make(env_name)
+state_dim = env.observation_space.shape[0]
+action_dim = env.action_space.n
 # env.seed(0)
 # torch.manual_seed(0)
-agent = TRPO(hidden_dim, env.observation_space, env.action_space, lmbda,
-             kl_constraint, alpha, critic_lr, gamma, device)
+agent = TRPO(state_dim, hidden_dim, action_dim, lmbda, kl_constraint, alpha, critic_lr, gamma, device)
 return_list = rl_utils.train_on_policy_agent(env, agent, num_episodes)
 
 episodes_list = list(range(len(return_list)))
