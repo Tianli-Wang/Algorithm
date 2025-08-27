@@ -94,3 +94,17 @@ action_dim = env.action_space.n
 agent = PPO(state_dim, hidden_dim, action_dim, actor_lr, critic_lr, lmbda, gamma, epochs, eps, device)
 
 return_list = rl_utils.train_on_policy_agent(env, agent, num_episodes)
+
+episodes_list = list(range(len(return_list)))
+plt.plot(episodes_list, return_list)
+plt.xlabel('Episodes')
+plt.ylabel('Returns')
+plt.title('PPO on {}'.format(env_name))
+plt.show()
+
+mv_return = rl_utils.moving_average(return_list, 9)
+plt.plot(episodes_list, mv_return)
+plt.xlabel('Episodes')
+plt.ylabel('Returns')
+plt.title('PPO on {}'.format(env_name))
+plt.show()
