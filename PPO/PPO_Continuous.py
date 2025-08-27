@@ -6,6 +6,12 @@ import matplotlib.pyplot as plt
 # import rl_utils
 from tqdm import tqdm
 
+
+
+import os
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+
+
 class PolicyNetContinuous(torch.nn.Module):
     def __init__(self, state_dim, hidden_dim, action_dim):
         super(PolicyNetContinuous, self).__init__()
