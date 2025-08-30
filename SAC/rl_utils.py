@@ -40,7 +40,9 @@ def train_on_policy_agent(env, agent, num_episodes):
                 done = False
                 while not done:
                     action = agent.take_action(state)
-                    next_state, reward, done, _, _ = env.step(action)
+                    print("Action1")
+                    next_state, reward, terminated, truncated, info = env.step(action)
+                    done = terminated or truncated
                     transition_dict['states'].append(state)
                     transition_dict['actions'].append(action)
                     transition_dict['next_states'].append(next_state)
@@ -109,11 +111,11 @@ def train_off_policy_agent(env, agent, num_episodes, replay_buffer, minimal_size
         with tqdm(total=int(num_episodes/10), desc='Iteration %d' % i) as pbar:
             for i_episode in range(int(num_episodes/10)):
                 episode_return = 0
-                state = env.reset()
+                state, _ = env.reset()
                 done = False
                 while not done:
                     action = agent.take_action(state)
-                    next_state, reward, done, _ = env.step(action)
+                    next_state, reward, done, _, _ = env.step(action)
                     replay_buffer.add(state, action, reward, next_state, done)
                     state = next_state
                     episode_return += reward
