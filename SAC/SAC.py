@@ -1,5 +1,5 @@
 import random
-import gym
+import gymnasium as gym
 import numpy as np
 from tqdm import tqdm
 import torch
@@ -8,7 +8,8 @@ from torch.distributions import Normal
 import matplotlib.pyplot as plt
 
 import rl_utils
-
+import warnings
+warnings.filterwarnings('ignore', category=DeprecationWarning, module='gym')
 class PolicyNetContinuous(torch.nn.Module):
     def __init__(self, state_dim, hidden_dim, action_dim, action_bound):
         super(PolicyNetContinuous, self).__init__()
@@ -72,7 +73,7 @@ class SAC_Continuous():
     def take_action(self, state):
         state = torch.tensor(state, dtype=torch.float).to(self.device)
         action, _ = self.actor(state)
-        print("Action2")
+        # print("Action3")
         return action.detach().cpu().numpy()
     
     def calculate_target(self, rewards, next_states, dones):
@@ -144,6 +145,7 @@ env_name = 'Pendulum-v1'
 env = gym.make(env_name)
 state_dim = env.observation_space.shape[0]
 action_dim = env.action_space.shape[0]
+print("action_dim:", action_dim)
 action_bound = env.action_space.high[0]  # 动作最大值
 
 actor_lr = 3e-4

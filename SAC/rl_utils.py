@@ -29,9 +29,13 @@ def moving_average(a, window_size):
 
 def train_on_policy_agent(env, agent, num_episodes):
     return_list = []
+    print("here 0")
     for i in range(10):
+        print("here 1")
         with tqdm(total=int(num_episodes/10), desc='Iteration %d' % i) as pbar:
+            print("here 2")
             for i_episode in range(int(num_episodes/10)):
+                print("here 3")
                 episode_return = 0
                 transition_dict = {'states': [], 'actions': [], 'next_states': [], 'rewards': [], 'dones': []}
                 # state = env.reset()
@@ -39,8 +43,9 @@ def train_on_policy_agent(env, agent, num_episodes):
 
                 done = False
                 while not done:
-                    action = agent.take_action(state)
                     print("Action1")
+                    action = agent.take_action(state)
+                    print("Action2")
                     next_state, reward, terminated, truncated, info = env.step(action)
                     done = terminated or truncated
                     transition_dict['states'].append(state)
@@ -114,8 +119,12 @@ def train_off_policy_agent(env, agent, num_episodes, replay_buffer, minimal_size
                 state, _ = env.reset()
                 done = False
                 while not done:
+                    # print("here 4")
                     action = agent.take_action(state)
-                    next_state, reward, done, _, _ = env.step(action)
+                    next_state, reward, terminated, truncated, info = env.step(action)
+                    # gym库的连续动作环境没有timeout，需要用gymnasium库配合terminated or truncated
+                    done = terminated or truncated
+                    # next_state, reward, done, _, _ = env.step(action)
                     replay_buffer.add(state, action, reward, next_state, done)
                     state = next_state
                     episode_return += reward
