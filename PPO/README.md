@@ -248,10 +248,19 @@ def compute_advantage(gamma, lmbda, td_delta):
 $$
 \underset{\theta}{\operatorname*{\mathrm{arg}\operatorname*{max}}}\mathbb{E}_{s\sim\nu}{}^{\pi_{\theta_{k}}}\mathbb{E}_{a\sim\pi_{\theta_{k}}(\cdot|s)}\left[\operatorname*{min}\left(\frac{\pi_{\theta}(a|s)}{\pi_{\theta_{k}}(a|s)}A^{\pi_{\theta_{k}}}(s,a),\operatorname{\mathrm{clip}}\left(\frac{\pi_{\theta}(a|s)}{\pi_{\theta_{k}}(a|s)},1-\epsilon,1+\epsilon\right)A^{\pi_{\theta_{k}}}(s,a)\right)\right]
 $$
-其中$clip(x,l,r)= max(min(x,r),l)$，把x限制在[l,r]范围内。
+其中$clip(x,l,r)= max(min(x,r),l)$，把x限制在[l,r]范围内。$\pi_{\theta_k}(a|s)$中的$k$是第k次迭代参数$\theta$，当更新完epochs后$k \to k+1$
 
 
 
 如果$A^{\pi_{\theta_k}}(s,a)>0$,说明这个动作的价值高于平均，最大化这个式子会增大$\frac{\pi_{\theta}(a|s)}{\pi_{\theta_{k}}(a|s)}$,但不会让其超过$1+\epsilon$。反之，如果$A^\pi_{\theta_{k}}(s,a)<0$,最大化这个式子会减小$\frac{\pi_{\theta}(a|s)}{\pi_{\theta_{k}}(a|s)}$,但不会让其超过1$-\epsilon$。
 
 ![image-20250902163536869](./assets/image-20250902163536869.png)
+
+
+
+**Note：**PPO算法会让智能体回顾最近经历的这一段经验（`transition_dict`），反复思考、总结、改进策略，连续学习 `epochs` 轮，而不是只学一遍就丢掉。定义好广义优势估计（GME）和TD目标后，$\pi_{\theta_k}(a|s)$作为`old_log_probs`参与计算。
+
+```python
+old_log_probs = torch.log(self.actor(states).gather(1, actions)).detach()
+```
+

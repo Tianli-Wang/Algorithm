@@ -77,7 +77,7 @@ class PPO:
             surr1 = ratio * advantage
             surr2 = torch.clamp(ratio, 1 - self.eps_clip, 1 + self.eps_clip) * advantage
             actor_loss = torch.mean(-torch.min(surr1, surr2))
-            critic_loss = torch.mean(F.mse_loss(self.critic(states), td_target.detach()))
+            critic_loss = F.mse_loss(self.critic(states), td_target.detach())
             writer.add_scalar("actor_loss", actor_loss.item(), self.update_step)
             writer.add_scalar("critic_loss", critic_loss.item(), self.update_step)
 
