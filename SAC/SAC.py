@@ -26,7 +26,9 @@ class PolicyNetContinuous(torch.nn.Module):
         dist = torch.distributions.Normal(mu, std)
         normal_sample = dist.rsample()
         log_prob = dist.log_prob(normal_sample)
+        # tanh变换，将无界动作映射为有界， a = tanh(z)
         action = torch.tanh(normal_sample)
+        # log(pa) = log(p(z)) + log(1 / (1 - a^2))
         log_prob = log_prob - torch.log(1 - action.pow(2) + 1e-7)
         action = action * self.action_bound
         return action, log_prob
@@ -145,7 +147,7 @@ env_name = 'Pendulum-v1'
 env = gym.make(env_name)
 state_dim = env.observation_space.shape[0]
 action_dim = env.action_space.shape[0]
-print("action_dim:", action_dim)
+# print("action_dim:", action_dim)
 action_bound = env.action_space.high[0]  # 动作最大值
 
 actor_lr = 3e-4
@@ -165,3 +167,17 @@ replay_buffer = rl_utils.ReplayBuffer(buffer_size)
 agent = SAC_Continuous(state_dim, hidden_dim, action_dim, action_bound, actor_lr, critic_lr, alpha_lr, target_entropy, tau, gamma, device)
 
 return_list = rl_utils.train_off_policy_agent(env, agent, num_episodes, replay_buffer, minimal_size, batch_size)
+
+episodes_list = list(range(len(return_list)))
+plt.plot(episodes_list, return_list)
+plt.xlabel('Episodes')
+plt.ylabel('Returns')
+plt.title('SAC on {}'.format(env_name))
+plt.show()
+
+mv_return = rl_utils.moving_average(return_list, 9)
+plt.plot(episodes_list, mv_return)
+plt.xlabel('Episodes')
+plt.ylabel('Returns')
+plt.title('SAC on {}'.format(env_name))
+plt.show()

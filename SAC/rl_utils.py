@@ -29,23 +29,17 @@ def moving_average(a, window_size):
 
 def train_on_policy_agent(env, agent, num_episodes):
     return_list = []
-    print("here 0")
     for i in range(10):
-        print("here 1")
         with tqdm(total=int(num_episodes/10), desc='Iteration %d' % i) as pbar:
-            print("here 2")
             for i_episode in range(int(num_episodes/10)):
-                print("here 3")
                 episode_return = 0
                 transition_dict = {'states': [], 'actions': [], 'next_states': [], 'rewards': [], 'dones': []}
                 # state = env.reset()
-                state, info = env.reset()  # 只取第一个元素作为状态
+                state, info = env.reset()  
 
                 done = False
                 while not done:
-                    print("Action1")
                     action = agent.take_action(state)
-                    print("Action2")
                     next_state, reward, terminated, truncated, info = env.step(action)
                     done = terminated or truncated
                     transition_dict['states'].append(state)
@@ -62,55 +56,8 @@ def train_on_policy_agent(env, agent, num_episodes):
                 pbar.update(1)
     return return_list
 
-# def train_on_policy_agent(env, agent, num_episodes):
-#     return_list = []
-#     for i in range(10):
-#         with tqdm(total=int(num_episodes/10), desc='Iteration %d' % i) as pbar:
-#             for i_episode in range(int(num_episodes/10)):
-#                 episode_return = 0
-#                 transition_dict = {'states': [], 'actions': [], 'next_states': [], 'rewards': [], 'dones': []}
-                
-#                 state, info = env.reset()
-#                 done = False
-#                 while not done:
-#                     action = agent.take_action(state)
-#                     next_state, reward, done, _, _ = env.step(action)
-                    
-#                     # 收集数据
-#                     transition_dict['states'].append(state)
-#                     transition_dict['actions'].append(action)
-#                     transition_dict['next_states'].append(next_state)
-#                     transition_dict['rewards'].append(reward)
-#                     transition_dict['dones'].append(done)
-                    
-#                     state = next_state
-#                     episode_return += reward
 
-#                 return_list.append(episode_return)
-
-#                 # 🔥 关键：在传给 agent.update 前，先转为 np.array
-#                 for key, value in transition_dict.items():
-#                     if key in ['states', 'next_states']:
-#                         transition_dict[key] = np.array(value, dtype=np.float32)
-#                     elif key == 'rewards':
-#                         transition_dict[key] = np.array(value, dtype=np.float32)
-#                     elif key == 'actions':
-#                         transition_dict[key] = np.array(value, dtype=np.int64)
-#                     elif key == 'dones':
-#                         transition_dict[key] = np.array(value, dtype=np.float32)
-
-#                 # 更新 agent
-#                 agent.update(transition_dict)
-
-#                 if (i_episode+1) % 10 == 0:
-#                     pbar.set_postfix({
-#                         'episode': '%d' % (num_episodes/10 * i + i_episode+1),
-#                         'return': '%.3f' % np.mean(return_list[-10:])
-#                     })
-#                 pbar.update(1)
-#     return return_list
-
-def train_off_policy_agent(env, agent, num_episodes, replay_buffer, minimal_size, batch_size):
+def train_off_policy_agent(env, agent, num_episodes, replay_buffer, minimal_size, batch_size, writer=None):
     return_list = []
     for i in range(10):
         with tqdm(total=int(num_episodes/10), desc='Iteration %d' % i) as pbar:
@@ -119,12 +66,9 @@ def train_off_policy_agent(env, agent, num_episodes, replay_buffer, minimal_size
                 state, _ = env.reset()
                 done = False
                 while not done:
-                    # print("here 4")
                     action = agent.take_action(state)
-                    next_state, reward, terminated, truncated, info = env.step(action)
-                    # gym库的连续动作环境没有timeout，需要用gymnasium库配合terminated or truncated
+                    next_state, reward, terminated, truncated, info = env.step(action) # gym库的连续动作环境没有timeout，需要用gymnasium库配合terminated or truncated
                     done = terminated or truncated
-                    # next_state, reward, done, _, _ = env.step(action)
                     replay_buffer.add(state, action, reward, next_state, done)
                     state = next_state
                     episode_return += reward
@@ -133,6 +77,11 @@ def train_off_policy_agent(env, agent, num_episodes, replay_buffer, minimal_size
                         transition_dict = {'states': b_s, 'actions': b_a, 'next_states': b_ns, 'rewards': b_r, 'dones': b_d}
                         agent.update(transition_dict)
                 return_list.append(episode_return)
+                
+                global_step = len(return_list)  # 使用 episode 数作为 step
+                if writer is not None:
+                    writer.add_scalar("Episode_Return", episode_return, global_step)
+
                 if (i_episode+1) % 10 == 0:
                     pbar.set_postfix({'episode': '%d' % (num_episodes/10 * i + i_episode+1), 'return': '%.3f' % np.mean(return_list[-10:])})
                 pbar.update(1)

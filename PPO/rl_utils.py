@@ -36,8 +36,12 @@ def train_on_policy_agent(env, agent, num_episodes):
                 transition_dict = {'states': [], 'actions': [], 'next_states': [], 'rewards': [], 'dones': []}
                 # state = env.reset()
                 state, info = env.reset()  # 只取第一个元素作为状态
-
                 done = False
+                while not done:
+                    action = agent.take_action(state)
+                    next_state, reward, terminated, truncated, info = env.step(action)
+                    done = terminated or truncated
+
                 while not done:
                     action = agent.take_action(state)
                     next_state, reward, done, _, _ = env.step(action)
