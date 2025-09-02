@@ -5,6 +5,15 @@ import numpy as np
 import matplotlib.pyplot as plt
 import rl_utils
 from tqdm import tqdm
+from torch.utils.tensorboard import SummaryWriter
+import os
+from datetime import datetime
+
+current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
+log_dir = f"logs/ppo_{current_time}"
+os.makedirs(log_dir, exist_ok=True)
+writer = SummaryWriter(log_dir)
+
 
 class PolicyNet(torch.nn.Module):
     def __init__(self, state_dim, hidden_dim, action_dim):
@@ -60,6 +69,7 @@ class PPO:
         advantage = rl_utils.compute_advantage(self.gamma, self.lmbda, td_delta).to(self.device)
         old_log_probs = torch.log(self.actor(states).gather(1, actions)).detach()
 
+        # 让智能体回顾最近经历的这一段经验（transition_dict），反复思考、总结、改进策略，连续学习 epochs 轮，而不是只学一遍就丢掉。
         for _ in range(self.epochs):
             log_probs = torch.log(self.actor(states).gather(1, actions))
             ratio = torch.exp(log_probs - old_log_probs)
@@ -68,6 +78,8 @@ class PPO:
             surr2 = torch.clamp(ratio, 1 - self.eps_clip, 1 + self.eps_clip) * advantage
             actor_loss = torch.mean(-torch.min(surr1, surr2))
             critic_loss = torch.mean(F.mse_loss(self.critic(states), td_target.detach()))
+            writer.add_scalar("actor_loss", actor_loss.item(), self.update_step)
+            writer.add_scalar("critic_loss", critic_loss.item(), self.update_step)
 
             self.actor_optimizer.zero_grad()
             self.critic_optimizer.zero_grad()
