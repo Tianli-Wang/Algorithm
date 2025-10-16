@@ -4,21 +4,37 @@ import numpy as np
 import random
 
 class NonUniformGridWorldEnv(gym.Env):
-    
-    def __init__(self, grid_size=5):
+    """
+    一个10x10的网格世界环境, 具有非均匀的转移概率和时间成本。
+
+    State: 智能体在网格上的位置，用 0-99 的整数表示。
+    Action: 4个离散动作 (0:上, 1:下, 2:左, 3:右)。
+    Transition: 从每个格子(s)执行每个动作(a)的成功概率 P(s,a) 和所需时间 T(s,a) 都是非均匀的。
+    Reward: 奖励基于移动所消耗的时间和特定事件（如到达终点、撞墙）。
+    """
+    metadata = {'render_modes': ['console']}
+
+    def __init__(self, grid_size=10, render_mode='console'):
         super(NonUniformGridWorldEnv, self).__init__()
         
         self.grid_size = grid_size
-        self.action_space = spaces.Discrete(4)  # Up, Down, Left, Right
+        self.render_mode = render_mode
 
+        # Action
+        self.action_space = spaces.Discrete(4)  # Up, Down, Left, Right
+        self.action_map = {
+            0: (-1, 0),  # 上
+            1: (1, 0),   # 下
+            2: (0, -1),  # 左
+            3: (0, 1)    # 右
+        }
         self.observation_space = spaces.Discrete(grid_size * grid_size)
 
         self.start_pos = (0, 0)
         self.goal_pos = (grid_size - 1, grid_size - 1)
 
-        # 所有概率和时间固定
-        self.possibility = 0.8
-        self.time = 1.0
+        # 初始化非均匀的概率和时间
+        self._initialize_dynamics()
 
         # Reward structure
         self.goal_reward = 10
@@ -35,6 +51,11 @@ class NonUniformGridWorldEnv(gym.Env):
     def _obs_to_pos(self, obs):
         return (obs // self.grid_size, obs % self.grid_size)
     
+    # TODO: _initialize_dynamics function
+
+
+    
+    
     def reset(self, seed=None, options=None):
         """重置环境到初始状态"""
         super().reset(seed=seed)
@@ -48,13 +69,7 @@ class NonUniformGridWorldEnv(gym.Env):
         current_pos = self.agent_pos
         
         # 将动作映射到方向变化
-        action_map = {
-            0: (-1, 0),  # 上
-            1: (1, 0),   # 下
-            2: (0, -1),  # 左
-            3: (0, 1)    # 右
-        }
-        move = action_map[action]
+        
         
         # 计算潜在的下一个位置
         next_pos_candidate = (current_pos[0] + move[0], current_pos[1] + move[1])
