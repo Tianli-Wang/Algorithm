@@ -100,7 +100,7 @@ class NonUniformGridWorldEnv(gym.Env):
             reward += self.goal_reward
 
         return self._pos_to_obs(self.agent_pos), float(reward), terminated, False, {}
-
+    # TODO:ObserveResult env differ with train, need to fix the env
     def render(self):
         if self.render_mode == 'console':
             print("\033[H\033[J", end="")  # 清屏
