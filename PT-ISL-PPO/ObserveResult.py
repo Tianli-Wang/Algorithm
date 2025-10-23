@@ -4,12 +4,14 @@ import numpy as np
 import time
 from stable_baselines3 import PPO
 
+GLOBAL_SEED=42
+
 # 导入并注册环境
 from MyEnv import NonUniformGridWorldEnv
 gym.register(
     id="NonUniformGridWorld-v0",
     entry_point=NonUniformGridWorldEnv,
-    kwargs={"grid_size": 10, "obstacle_ratio": 0.15}
+    kwargs={"grid_size": 10, "obstacle_ratio": 0.15, 'seed': GLOBAL_SEED}
 )
 
 # 加载模型
@@ -24,7 +26,8 @@ while hasattr(raw_env, 'env') and raw_env.env is not None:
     raw_env = raw_env.env
 
 # 运行演示
-print("加载模型成功，3秒后开始动画...")
+print("start to observe the result...")
+
 time.sleep(2)
 
 obs, _ = env.reset()
