@@ -30,7 +30,7 @@ env = make_vec_env('NonUniformGridWorld-v0', n_envs=num_cpu)
 
 # 创建 PPO 模型
 model = PPO(
-    "MlpPolicy",
+    "MultiInputPolicy",
     env,
     verbose=1,
     device="cpu",

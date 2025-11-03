@@ -5,6 +5,20 @@ import numpy as np
 import random
 
 class NonUniformGridWorldEnv(gym.Env):
+    """
+    一个非均匀网格世界环境。
+    - 观测空间 (Dict):
+        - "agent_pos": (row, col)
+        - "surroundings": [上, 下, 左, 右] 是否被阻挡 (0=通路, 1=阻挡)
+    - 动作空间 (Discrete): 4 (上, 下, 左, 右)
+    - 奖励: 
+        - 成功移动: -time_cost
+        - 失败移动: -time_cost + fail_penalty
+        - 撞墙/障碍: wall_penalty
+        - 奖励塑形: +/- manhattan_reward
+        - 到达终点: +goal_reward
+    """
+
     metadata = {'render_modes': ['console']}
 
     def __init__(self, grid_size=10, render_mode='console', seed=None, obstacle_ratio=0.1):
@@ -20,7 +34,12 @@ class NonUniformGridWorldEnv(gym.Env):
             2: (0, -1),  
             3: (0, 1)    
         }
-        self.observation_space = spaces.Discrete(grid_size * grid_size)
+
+        # 观测空间定义为字典，包含agent_pos和surroundings
+        self.observation_space = spaces.Dict({
+            "agent_pos": spaces.Box(low=0, high=grid_size-1, shape=(2,), dtype=np.int32),
+            "surroundings": spaces.Box(low=0, high=1, shape=(4,), dtype=np.int32)
+        })
 
         self.start_pos = (0, 0)
         self.goal_pos = (grid_size - 1, grid_size - 1)
@@ -30,18 +49,39 @@ class NonUniformGridWorldEnv(gym.Env):
         self.goal_reward = 50.0
         self.wall_penalty = -5.0
         self.fail_penalty = -2.0
-        self.stay_penalty = -3.0
         self.manhattan_reward = 0.1
 
         self.agent_pos = None
 
-    def _pos_to_obs(self, pos):
-        return pos[0] * self.grid_size + pos[1]
+    def _get_obs(self):
+        """获取当前的字典观测值。"""
+        surroundings = [0, 0, 0, 0] # 对应 [上, 下, 左, 右]
+        current_pos = self.agent_pos
+
+        for action, move in self.action_map.items():
+            neighbor_pos = (current_pos[0] + move[0], current_pos[1] + move[1])
+            
+            # 检查是否越界 (墙)
+            if not (0 <= neighbor_pos[0] < self.grid_size and 0 <= neighbor_pos[1] < self.grid_size):
+                surroundings[action] = 1 # 阻挡
+            # 检查是否是障碍物
+            elif neighbor_pos in self.obstacles:
+                surroundings[action] = 1 # 阻挡
+
+        return {
+            "agent_pos": np.array(self.agent_pos, dtype=np.int32),
+            "surroundings": np.array(surroundings, dtype=np.int32)
+        }
+
+
+    # def _pos_to_obs(self, pos):
+    #     return pos[0] * self.grid_size + pos[1]
     
-    def _obs_to_pos(self, obs):
-        return (obs // self.grid_size, obs % self.grid_size)
+    # def _obs_to_pos(self, obs):
+    #     return (obs // self.grid_size, obs % self.grid_size)
     
     def _initialize_dynamics(self, seed=None):
+        """初始化概率、时间和障碍物。"""
         rng = np.random.default_rng(seed)
         self.possibility_matrix = rng.uniform(0.6, 1.0, (self.grid_size, self.grid_size, 4))
         self.time_matrix = rng.integers(1, 5, (self.grid_size, self.grid_size, 4))
@@ -61,13 +101,13 @@ class NonUniformGridWorldEnv(gym.Env):
         super().reset(seed=seed)
 
         self.agent_pos = self.start_pos
-        return self._pos_to_obs(self.agent_pos), {}
+        # return self._pos_to_obs(self.agent_pos), {}
+        return self._get_obs(), {}
 
     def step(self, action):
         action = int(action)
         current_pos = self.agent_pos
 
-        # manhattan distance to goal
         current_dist = abs(current_pos[0] - self.goal_pos[0]) + abs(current_pos[1] - self.goal_pos[1])
 
         move = self.action_map[action]
@@ -76,43 +116,94 @@ class NonUniformGridWorldEnv(gym.Env):
         next_pos = current_pos
         reward = 0.0
 
-        # check if out of bounds
+        # 检查是否撞墙或障碍物
         if not (0 <= next_pos_candidate[0] < self.grid_size and 0 <= next_pos_candidate[1] < self.grid_size):
             reward = self.wall_penalty
-
-        # check if is obstacle
         elif next_pos_candidate in self.obstacles:
             reward = self.wall_penalty
         
-        # try to move
+        # 尝试移动
         else:   
             prob = self.possibility_matrix[current_pos[0], current_pos[1], action]
             time_cost = self.time_matrix[current_pos[0], current_pos[1], action]
 
             if self.np_random.random() < prob:
-                next_pos = next_pos_candidate # only successd to change position
-                reward = -time_cost  # time cost
+                next_pos = next_pos_candidate # 成功移动
+                reward = -time_cost  # 付出时间成本
             else:
-                # failed to move + time cost
-                reward = self.fail_penalty - time_cost
-        
-        if next_pos == current_pos:
-            reward += self.stay_penalty # if stay in place, penalty with time cost
-
+                # 失败移动 (停在原地)
+                # 付出时间成本 + 额外的失败惩罚
+                reward = -time_cost + self.fail_penalty 
+       
         self.agent_pos = next_pos
 
-        # reward shaping
+        # 奖励塑形
         new_dist = abs(next_pos[0] - self.goal_pos[0]) + abs(next_pos[1] - self.goal_pos[1])
-        if new_dist < current_dist:
-            reward += self.manhattan_reward 
-        else:
-            reward -= self.manhattan_reward
-
+        
         terminated = (self.agent_pos == self.goal_pos)
-        if terminated:
-            reward += self.goal_reward
+        
+        if not terminated:
+            if new_dist < current_dist:
+                reward += self.manhattan_reward # 接近目标的奖励
+            elif new_dist >= current_dist: # 停下或远离
+                reward -= self.manhattan_reward # 惩罚
 
-        return self._pos_to_obs(self.agent_pos), float(reward), terminated, False, {}
+        if terminated:
+            reward += self.goal_reward # 到达终点
+
+        return self._get_obs(), float(reward), terminated, False, {}
+
+
+    # def step(self, action):
+    #     action = int(action)
+    #     current_pos = self.agent_pos
+
+    #     # manhattan distance to goal
+    #     current_dist = abs(current_pos[0] - self.goal_pos[0]) + abs(current_pos[1] - self.goal_pos[1])
+
+    #     move = self.action_map[action]
+    #     next_pos_candidate = (current_pos[0] + move[0], current_pos[1] + move[1])
+
+    #     next_pos = current_pos
+    #     reward = 0.0
+
+    #     # check if out of bounds
+    #     if not (0 <= next_pos_candidate[0] < self.grid_size and 0 <= next_pos_candidate[1] < self.grid_size):
+    #         reward = self.wall_penalty
+
+    #     # check if is obstacle
+    #     elif next_pos_candidate in self.obstacles:
+    #         reward = self.wall_penalty
+        
+    #     # try to move
+    #     else:   
+    #         prob = self.possibility_matrix[current_pos[0], current_pos[1], action]
+    #         time_cost = self.time_matrix[current_pos[0], current_pos[1], action]
+
+    #         if self.np_random.random() < prob:
+    #             next_pos = next_pos_candidate # only successd to change position
+    #             reward = -time_cost  # time cost
+    #         else:
+    #             # failed to move + time cost
+    #             reward = self.fail_penalty - time_cost
+        
+    #     if next_pos == current_pos:
+    #         reward += self.stay_penalty # if stay in place, penalty with time cost
+
+    #     self.agent_pos = next_pos
+
+    #     # reward shaping
+    #     new_dist = abs(next_pos[0] - self.goal_pos[0]) + abs(next_pos[1] - self.goal_pos[1])
+    #     if new_dist < current_dist:
+    #         reward += self.manhattan_reward 
+    #     else:
+    #         reward -= self.manhattan_reward
+
+    #     terminated = (self.agent_pos == self.goal_pos)
+    #     if terminated:
+    #         reward += self.goal_reward
+
+    #     return self._pos_to_obs(self.agent_pos), float(reward), terminated, False, {}
     
     def render(self):
         if self.render_mode == 'console':
