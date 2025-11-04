@@ -34,9 +34,9 @@ model = PPO(
     env,
     verbose=1,
     device="cpu",
-    n_steps=2048,
-    batch_size=128,
-    n_epochs=10, # number of policy updates
+    n_steps=128,
+    batch_size=32,
+    n_epochs=4,
     learning_rate=0.001,
     gamma=0.99,
     gae_lambda=0.95,
@@ -45,8 +45,13 @@ model = PPO(
 
 # 训练
 print("start to train...")
-model.learn(total_timesteps=1_000_000)
+model.learn(total_timesteps=10_000_000)
+
+"""
+"""
+
 model.save("ppo_gridworld")
 env.close()
+
 
 print("模型已保存为 'ppo_gridworld.zip'")

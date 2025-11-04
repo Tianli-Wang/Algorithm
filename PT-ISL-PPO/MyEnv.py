@@ -46,7 +46,7 @@ class NonUniformGridWorldEnv(gym.Env):
 
         self._initialize_dynamics(seed)
 
-        self.goal_reward = 50.0
+        self.goal_reward = 500.0
         self.wall_penalty = -5.0
         self.fail_penalty = -2.0
         self.manhattan_reward = 0.1
@@ -142,7 +142,7 @@ class NonUniformGridWorldEnv(gym.Env):
         
         terminated = (self.agent_pos == self.goal_pos)
         
-        if not terminated:
+        if not terminated and next_pos != current_pos:
             if new_dist < current_dist:
                 reward += self.manhattan_reward # 接近目标的奖励
             elif new_dist >= current_dist: # 停下或远离
