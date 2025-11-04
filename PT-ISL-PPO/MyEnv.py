@@ -38,7 +38,9 @@ class NonUniformGridWorldEnv(gym.Env):
         # 观测空间定义为字典，包含agent_pos和surroundings
         self.observation_space = spaces.Dict({
             "agent_pos": spaces.Box(low=0, high=grid_size-1, shape=(2,), dtype=np.int32),
-            "surroundings": spaces.Box(low=0, high=1, shape=(4,), dtype=np.int32)
+            "surroundings": spaces.Box(low=0, high=1, shape=(4,), dtype=np.int32),
+            "goal_direction": spaces.Box(low=-1, high=1, shape=(2,), dtype=np.float32),  # 归一化方向
+            "goal_distance": spaces.Box(low=0, high=grid_size*2, shape=(1,), dtype=np.float32)  # 曼哈顿距离
         })
 
         self.start_pos = (0, 0)
@@ -46,11 +48,11 @@ class NonUniformGridWorldEnv(gym.Env):
 
         self._initialize_dynamics(seed)
 
-        self.goal_reward = 500.0
-        self.wall_penalty = -10.0
-        self.fail_penalty = -5.0
-        self.manhattan_reward = 1.0    # 显著增大塑形奖励
-        self.step_penalty = -0.5       # 每步的小惩罚,鼓励快速到达
+        self.goal_reward = 100.0          # 降低,使路径奖励更有意义
+        self.wall_penalty = -5.0          # 减轻墙壁惩罚
+        self.fail_penalty = -2.0          # 大幅减轻失败惩罚
+        self.manhattan_reward = 1       # 适中的塑形奖励
+        self.step_penalty = -0.1          # 轻微的步数惩罚
 
         self.agent_pos = None
 
@@ -69,17 +71,24 @@ class NonUniformGridWorldEnv(gym.Env):
             elif neighbor_pos in self.obstacles:
                 surroundings[action] = 1 # 阻挡
 
+        delta_row = self.goal_pos[0] - current_pos[0]
+        delta_col = self.goal_pos[1] - current_pos[1]
+        distance = abs(delta_row) + abs(delta_col)
+
+        if distance > 0:
+            goal_direction = np.array([
+                delta_row / distance,
+                delta_col / distance
+            ], dtype=np.float32)
+        else:
+            goal_direction = np.array([0.0, 0.0], dtype=np.float32)
+        
         return {
             "agent_pos": np.array(self.agent_pos, dtype=np.int32),
-            "surroundings": np.array(surroundings, dtype=np.int32)
+            "surroundings": np.array(surroundings, dtype=np.int32),
+            "goal_direction": goal_direction,
+            "goal_distance": np.array([distance], dtype=np.float32)
         }
-
-
-    # def _pos_to_obs(self, pos):
-    #     return pos[0] * self.grid_size + pos[1]
-    
-    # def _obs_to_pos(self, obs):
-    #     return (obs // self.grid_size, obs % self.grid_size)
     
     def _initialize_dynamics(self, seed=None):
         """初始化概率、时间和障碍物。"""
@@ -100,9 +109,7 @@ class NonUniformGridWorldEnv(gym.Env):
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
-
         self.agent_pos = self.start_pos
-        # return self._pos_to_obs(self.agent_pos), {}
         return self._get_obs(), {}
 
     def step(self, action):
@@ -142,12 +149,9 @@ class NonUniformGridWorldEnv(gym.Env):
         # 奖励塑形
         new_dist = abs(next_pos[0] - self.goal_pos[0]) + abs(next_pos[1] - self.goal_pos[1])
 
-        # 只有成功移动时才给予方向奖励
-        if moved_successfully:
-            if new_dist < current_dist:
-                reward += self.manhattan_reward  # 接近目标
-            elif new_dist > current_dist:
-                reward -= self.manhattan_reward  # 远离目标
+        # 距离减少就给奖励,增加就惩罚
+        dist_change = current_dist - new_dist
+        reward += dist_change * self.manhattan_reward
 
         terminated = (self.agent_pos == self.goal_pos)
         if terminated:

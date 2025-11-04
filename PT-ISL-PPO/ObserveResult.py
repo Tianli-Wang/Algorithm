@@ -11,7 +11,7 @@ from MyEnv import NonUniformGridWorldEnv
 gym.register(
     id="NonUniformGridWorld-v0",
     entry_point=NonUniformGridWorldEnv,
-    kwargs={"grid_size": 10, "obstacle_ratio": 0.15, 'seed': GLOBAL_SEED}
+    kwargs={"grid_size": 5, "obstacle_ratio": 0.15, 'seed': GLOBAL_SEED}
 )
 
 # 加载模型

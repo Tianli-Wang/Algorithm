@@ -14,11 +14,11 @@ GLOBAL_SEED = 42
 register(
     id='NonUniformGridWorld-v0',
     entry_point='MyEnv:NonUniformGridWorldEnv',
-    kwargs={'grid_size': 10, 'obstacle_ratio': 0.15, 'seed': GLOBAL_SEED}
+    kwargs={'grid_size': 5, 'obstacle_ratio': 0.15, 'seed': GLOBAL_SEED}
 )
 
 # 使用512个并行环境
-n_envs = 512
+n_envs = 256
 print(f"使用 {n_envs} 个并行环境进行训练")
 
 # 创建训练环境
@@ -28,10 +28,10 @@ env = make_vec_env('NonUniformGridWorld-v0', n_envs=n_envs)
 eval_env = make_vec_env('NonUniformGridWorld-v0', n_envs=4)
 
 # 针对大规模并行优化的参数
-n_steps = 256               # 适度增加,平衡收集效率
+n_steps = 512               # 适度增加,平衡收集效率
 batch_size = 4096           # 大幅增加,适配大buffer
 n_epochs = 4                # 保持4轮,避免过拟合
-total_timesteps = 50_000_000  # 增加总步数
+total_timesteps = 1_000_000  # 增加总步数
 
 total_buffer_size = n_steps * n_envs
 updates_per_iteration = (total_buffer_size // batch_size) * n_epochs
@@ -65,7 +65,7 @@ model = PPO(
     n_epochs=4,                # 4轮足够,避免过拟合
     
     # 学习率 - 大batch需要调整
-    learning_rate=3e-4,        # 可以考虑线性衰减
+    learning_rate=9e-4,        # 可以考虑线性衰减
     
     # 折扣和优势估计
     gamma=0.99,
@@ -80,8 +80,8 @@ model = PPO(
     # 网络结构
     policy_kwargs=dict(
         net_arch=dict(
-            pi=[256, 256],     # actor
-            vf=[256, 256]      # critic  
+            pi=[256, 256, 128],     # actor
+            vf=[256, 256, 128]      # critic  
         )
     ),
 )
