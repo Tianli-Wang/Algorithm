@@ -47,9 +47,10 @@ class NonUniformGridWorldEnv(gym.Env):
         self._initialize_dynamics(seed)
 
         self.goal_reward = 500.0
-        self.wall_penalty = -5.0
-        self.fail_penalty = -2.0
-        self.manhattan_reward = 0.1
+        self.wall_penalty = -10.0
+        self.fail_penalty = -5.0
+        self.manhattan_reward = 1.0    # 显著增大塑形奖励
+        self.step_penalty = -0.5       # 每步的小惩罚,鼓励快速到达
 
         self.agent_pos = None
 
@@ -114,13 +115,14 @@ class NonUniformGridWorldEnv(gym.Env):
         next_pos_candidate = (current_pos[0] + move[0], current_pos[1] + move[1])
 
         next_pos = current_pos
-        reward = 0.0
+        reward = self.step_penalty
+        moved_successfully = False
 
         # 检查是否撞墙或障碍物
         if not (0 <= next_pos_candidate[0] < self.grid_size and 0 <= next_pos_candidate[1] < self.grid_size):
-            reward = self.wall_penalty
+            reward += self.wall_penalty
         elif next_pos_candidate in self.obstacles:
-            reward = self.wall_penalty
+            reward += self.wall_penalty
         
         # 尝试移动
         else:   
@@ -128,26 +130,26 @@ class NonUniformGridWorldEnv(gym.Env):
             time_cost = self.time_matrix[current_pos[0], current_pos[1], action]
 
             if self.np_random.random() < prob:
-                next_pos = next_pos_candidate # 成功移动
-                reward = -time_cost  # 付出时间成本
+                next_pos = next_pos_candidate
+                reward += -time_cost
+                moved_successfully = True
             else:
-                # 失败移动 (停在原地)
-                # 付出时间成本 + 额外的失败惩罚
-                reward = -time_cost + self.fail_penalty 
+                # 失败移动
+                reward += -time_cost + self.fail_penalty
        
         self.agent_pos = next_pos
 
         # 奖励塑形
         new_dist = abs(next_pos[0] - self.goal_pos[0]) + abs(next_pos[1] - self.goal_pos[1])
-        
-        terminated = (self.agent_pos == self.goal_pos)
-        
-        if not terminated and next_pos != current_pos:
-            if new_dist < current_dist:
-                reward += self.manhattan_reward # 接近目标的奖励
-            elif new_dist >= current_dist: # 停下或远离
-                reward -= self.manhattan_reward # 惩罚
 
+        # 只有成功移动时才给予方向奖励
+        if moved_successfully:
+            if new_dist < current_dist:
+                reward += self.manhattan_reward  # 接近目标
+            elif new_dist > current_dist:
+                reward -= self.manhattan_reward  # 远离目标
+
+        terminated = (self.agent_pos == self.goal_pos)
         if terminated:
             reward += self.goal_reward # 到达终点
 

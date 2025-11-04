@@ -15,7 +15,7 @@ gym.register(
 )
 
 # 加载模型
-model = PPO.load("ppo_gridworld")
+model = PPO.load("ppo_gridworld_final")
 
 # 创建可渲染环境
 env = gym.make("NonUniformGridWorld-v0", render_mode="console")
